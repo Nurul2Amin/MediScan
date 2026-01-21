@@ -133,7 +133,7 @@ class _PharmacyMapPageState extends State<PharmacyMapPage> {
                           children: [
                              Text(pharmacy.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
                              const SizedBox(height: 4),
-                             Text(pharmacy.address, style: const TextStyle(color: Colors.black87)),
+                             Text(pharmacy.address ?? 'No address', style: const TextStyle(color: Colors.black87)),
                              const SizedBox(height: 12),
                              Row(
                                children: [

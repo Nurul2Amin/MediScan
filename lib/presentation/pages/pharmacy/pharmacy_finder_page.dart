@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:prescription_scanner/data/models/pharmacy_item.dart';
 import 'package:prescription_scanner/data/providers.dart';
+import 'package:prescription_scanner/presentation/providers/auth_provider.dart';
 import 'package:prescription_scanner/presentation/providers/cart_provider.dart';
 
 class PharmacyFinderPage extends ConsumerStatefulWidget {
@@ -57,16 +58,59 @@ class _PharmacyFinderPageState extends ConsumerState<PharmacyFinderPage> {
         return;
       }
 
-      // 3. Find Pharmacies (RPC)
+      // 3. Get user preferences
+      final profile = ref.read(userProfileProvider).value;
+      final defaultRadiusM = profile?.defaultRadiusM ?? 5000;
+      final sortMode = profile?.sortMode ?? 'balanced';
+      final requireFullMatch = profile?.requireFullMatch ?? false;
+      final maxResults = profile?.maxResults ?? 20;
+
+      // 4. Find Pharmacies (RPC) using user's default radius
       final repo = ref.read(pharmacyRepositoryProvider);
       final results = await repo.findPharmacies(
         lat: _currentPosition!.latitude,
         long: _currentPosition!.longitude,
         medicineIds: medicineIds,
-        radius: 5000, 
+        radius: defaultRadiusM, 
       );
 
-      _pharmacies = results;
+      // 5. Apply client-side filtering and sorting
+      var filteredResults = results;
+      
+      // Filter: require_full_match (only pharmacies with all cart items)
+      if (requireFullMatch && medicineIds.isNotEmpty) {
+        final requiredCount = medicineIds.length;
+        filteredResults = results.where((p) => p.matchedItems >= requiredCount).toList();
+      }
+
+      // Sort based on user preference
+      switch (sortMode) {
+        case 'nearest':
+          filteredResults.sort((a, b) => a.distance.compareTo(b.distance));
+          break;
+        case 'cheapest':
+          filteredResults.sort((a, b) => a.totalPrice.compareTo(b.totalPrice));
+          break;
+        case 'most_matched':
+          filteredResults.sort((a, b) => b.matchedItems.compareTo(a.matchedItems));
+          break;
+        case 'balanced':
+        default:
+          // Balanced: prioritize matched_items desc, then distance asc, then price asc
+          filteredResults.sort((a, b) {
+            final matchDiff = b.matchedItems.compareTo(a.matchedItems);
+            if (matchDiff != 0) return matchDiff;
+            final distDiff = a.distance.compareTo(b.distance);
+            if (distDiff != 0) return distDiff;
+            return a.totalPrice.compareTo(b.totalPrice);
+          });
+          break;
+      }
+
+      // Limit results
+      filteredResults = filteredResults.take(maxResults).toList();
+
+      _pharmacies = filteredResults;
       _buildMarkers();
 
     } catch (e) {
@@ -184,17 +228,22 @@ class _PharmacyFinderPageState extends ConsumerState<PharmacyFinderPage> {
                     ),
                     MarkerLayer(markers: _markers),
                     if (_currentPosition != null)
-                        CircleLayer(
-                            circles: [
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final defaultRadiusM = ref.read(userProfileProvider).value?.defaultRadiusM.toDouble() ?? 5000;
+                            return CircleLayer(
+                              circles: [
                                 CircleMarker(
-                                    point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                                    color: Colors.blue.withOpacity(0.1),
-                                    borderStrokeWidth: 2,
-                                    borderColor: Colors.blue,
-                                    useRadiusInMeter: true,
-                                    radius: 5000, // 5km radius
+                                  point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                                  color: Colors.blue.withOpacity(0.1),
+                                  borderStrokeWidth: 2,
+                                  borderColor: Colors.blue,
+                                  useRadiusInMeter: true,
+                                  radius: defaultRadiusM,
                                 )
-                            ],
+                              ],
+                            );
+                          },
                         ),
                   ],
                 ),

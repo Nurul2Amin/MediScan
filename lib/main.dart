@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prescription_scanner/config/app_config.dart';
 import 'package:prescription_scanner/presentation/theme/theme.dart';
-import 'package:prescription_scanner/presentation/pages/home/home_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:prescription_scanner/config/env.dart';
 import 'package:prescription_scanner/data/providers.dart';

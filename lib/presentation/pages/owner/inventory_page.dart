@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prescription_scanner/data/models/medicine.dart';
 import 'package:prescription_scanner/data/providers.dart';
+import 'package:prescription_scanner/presentation/providers/auth_provider.dart';
 
 class InventoryPage extends ConsumerStatefulWidget {
   final int pharmacyId;
@@ -32,7 +32,21 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
           .select('*, medicine:medicines!inner(*)') // Join with medicines table
           .eq('pharmacy_id', widget.pharmacyId);
       
-      setState(() => _inventory = List<Map<String, dynamic>>.from(response));
+      var inventory = List<Map<String, dynamic>>.from(response);
+      
+      // Apply owner preferences filtering
+      final profile = ref.read(userProfileProvider).value;
+      final showLowStockOnly = profile?.showLowStockOnly ?? false;
+      final lowStockThreshold = profile?.lowStockThreshold ?? 10;
+      
+      if (showLowStockOnly) {
+        inventory = inventory.where((item) {
+          final stockQty = item['stock_qty'] as int? ?? 0;
+          return stockQty <= lowStockThreshold;
+        }).toList();
+      }
+      
+      setState(() => _inventory = inventory);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
@@ -257,9 +271,17 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
               itemBuilder: (context, index) {
                 final item = _inventory[index];
                 final med = item['medicine'];
+                final stockQty = item['stock_qty'] as int? ?? 0;
+                final profile = ref.read(userProfileProvider).value;
+                final lowStockThreshold = profile?.lowStockThreshold ?? 10;
+                final isLowStock = stockQty <= lowStockThreshold;
+                
                 return ListTile(
                   title: Text(med['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('${med['form'] ?? 'Tablet'} • Stock: ${item['stock_qty']} • Price: \$${item['price']}'),
+                  leading: isLowStock
+                      ? const Icon(Icons.warning, color: Colors.orange)
+                      : const Icon(Icons.check_circle, color: Colors.green),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

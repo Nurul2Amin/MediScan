@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:prescription_scanner/presentation/pages/auth/login_page.dart';
+import 'package:prescription_scanner/presentation/pages/auth/signup_page.dart';
 import 'package:prescription_scanner/presentation/pages/home/home_page.dart';
 import 'package:prescription_scanner/presentation/pages/owner/owner_dashboard.dart';
+import 'package:prescription_scanner/presentation/pages/settings/settings_page.dart';
 import 'package:prescription_scanner/presentation/providers/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -16,21 +18,28 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       // 1. Check Auth State
       final isLoggedIn = authState.value?.session != null;
-      final isLoggingIn = state.uri.toString() == '/login';
+      final currentPath = state.uri.toString();
+      final isAuthPage = currentPath == '/login' || currentPath == '/signup';
 
       if (authState.isLoading) return null; // Loading
 
+      // 2. Redirect unauthenticated users (except auth pages)
       if (!isLoggedIn) {
-        return isLoggingIn ? null : '/login';
+        return isAuthPage ? null : '/login';
       }
 
-      // 2. Check User Profile (Role)
+      // 3. Check User Profile (Role)
       if (userProfile.isLoading) return null; // Still fetching profile
 
       final profile = userProfile.value;
       
-      // If logging in and we have a profile, redirect based on role
-      if (isLoggingIn || state.uri.toString() == '/') {
+      // 4. Block /owner route for non-owners
+      if (currentPath == '/owner' && profile?.role != 'pharmacy_owner') {
+        return '/home'; // Redirect non-owners away from owner dashboard
+      }
+
+      // 5. Redirect root and auth pages based on role
+      if (currentPath == '/' || isAuthPage) {
         if (profile?.role == 'pharmacy_owner') {
           return '/owner';
         } else {
@@ -50,12 +59,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginPage(),
       ),
       GoRoute(
+        path: '/signup',
+        builder: (context, state) => const SignupPage(),
+      ),
+      GoRoute(
         path: '/home',
         builder: (context, state) => const HomePage(),
       ),
       GoRoute(
         path: '/owner',
         builder: (context, state) => const OwnerDashboardPage(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsPage(),
       ),
     ],
   );

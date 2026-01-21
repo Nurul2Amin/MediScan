@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prescription_scanner/presentation/providers/owner_provider.dart';
 import 'package:prescription_scanner/presentation/pages/owner/pharmacy_setup_page.dart';
 import 'package:prescription_scanner/presentation/pages/owner/inventory_page.dart';
+import 'package:prescription_scanner/presentation/pages/settings/settings_page.dart';
 import 'package:prescription_scanner/data/providers.dart';
 
 class OwnerDashboardPage extends ConsumerWidget {
@@ -16,6 +17,14 @@ class OwnerDashboardPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Owner Dashboard'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => ref.read(supabaseProvider).auth.signOut(),

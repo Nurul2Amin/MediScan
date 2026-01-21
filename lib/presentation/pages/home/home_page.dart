@@ -5,6 +5,7 @@ import 'package:prescription_scanner/data/models/medicine.dart';
 import 'package:prescription_scanner/data/providers.dart';
 import 'package:prescription_scanner/presentation/pages/cart/cart_page.dart';
 import 'package:prescription_scanner/presentation/pages/scan/scan_page.dart';
+import 'package:prescription_scanner/presentation/pages/settings/settings_page.dart';
 import 'package:prescription_scanner/presentation/providers/auth_provider.dart';
 import 'package:prescription_scanner/presentation/providers/cart_provider.dart';
 
@@ -69,6 +70,14 @@ class HomePage extends ConsumerWidget {
                 onPressed: () {
                    Navigator.of(context).push(
                     MaterialPageRoute(builder: (context) => const CartPage()),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const SettingsPage()),
                   );
                 },
               ),
