@@ -16,29 +16,24 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     debugLogDiagnostics: true,
     redirect: (context, state) {
-      // 1. Check Auth State
       final isLoggedIn = authState.value?.session != null;
       final currentPath = state.uri.toString();
       final isAuthPage = currentPath == '/login' || currentPath == '/signup';
 
-      if (authState.isLoading) return null; // Loading
+      if (authState.isLoading) return null;
 
-      // 2. Redirect unauthenticated users (except auth pages)
       if (!isLoggedIn) {
         return isAuthPage ? null : '/login';
       }
 
-      // 3. Check User Profile (Role)
-      if (userProfile.isLoading) return null; // Still fetching profile
+      if (userProfile.isLoading) return null;
 
       final profile = userProfile.value;
       
-      // 4. Block /owner route for non-owners
       if (currentPath == '/owner' && profile?.role != 'pharmacy_owner') {
-        return '/home'; // Redirect non-owners away from owner dashboard
+        return '/home';
       }
 
-      // 5. Redirect root and auth pages based on role
       if (currentPath == '/' || isAuthPage) {
         if (profile?.role == 'pharmacy_owner') {
           return '/owner';
@@ -47,7 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      return null; // No redirect needed
+      return null;
     },
     routes: [
       GoRoute(

@@ -143,7 +143,7 @@ class _PharmacyMapPageState extends State<PharmacyMapPage> {
                                ],
                              ),
                              if (pharmacy.totalPrice != null)
-                               Text('Total Price: \$${pharmacy.totalPrice}'),
+                               Text('Total Price: ৳${pharmacy.totalPrice}'),
                           ],
                         ),
                       ));

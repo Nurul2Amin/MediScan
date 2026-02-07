@@ -1,9 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:prescription_scanner/data/models/user_profile.dart';
 import 'package:prescription_scanner/data/providers.dart';
 
-// 2. Auth State Provider (Stream)
 final authStateProvider = StreamProvider<AuthState>((ref) {
   return ref.watch(supabaseProvider).auth.onAuthStateChange;
 });
@@ -22,14 +22,16 @@ final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   if (user == null) return null;
 
   try {
+    debugPrint('Fetching profile for user: ${user.id}');
     final response = await supabase
         .from('profiles')
         .select()
         .eq('user_id', user.id)
         .single();
+    debugPrint('Profile found: $response');
     return UserProfile.fromJson(response);
   } catch (e) {
-    // If profile doesn't exist yet (race condition on signup), return default or null
+    debugPrint('Profile not found or error: $e');
     return null;
   }
 });

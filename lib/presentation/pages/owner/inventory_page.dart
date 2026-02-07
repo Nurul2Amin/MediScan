@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prescription_scanner/data/models/medicine.dart';
 import 'package:prescription_scanner/data/providers.dart';
 import 'package:prescription_scanner/presentation/providers/auth_provider.dart';
+import 'package:prescription_scanner/core/helpers/stock_formatter.dart';
+import 'package:prescription_scanner/core/helpers/error_handler.dart';
 
 class InventoryPage extends ConsumerStatefulWidget {
   final int pharmacyId;
@@ -48,7 +50,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       
       setState(() => _inventory = inventory);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppErrorHandler.getUserFriendlyMessage(e))));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -202,7 +204,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
+                        SnackBar(content: Text(AppErrorHandler.getUserFriendlyMessage(e))),
                       );
                     }
                   }
@@ -227,7 +229,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppErrorHandler.getUserFriendlyMessage(e))));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -272,13 +274,22 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                 final item = _inventory[index];
                 final med = item['medicine'];
                 final stockQty = item['stock_qty'] as int? ?? 0;
+                final leafletsPerBox = item['leaflets_per_box'] as int? ?? 1;
+                final pillsPerLeaflet = item['pills_per_leaflet'] as int? ?? 1;
+                final totalPills = stockQty * leafletsPerBox * pillsPerLeaflet;
+                final stockDisplay = StockFormatter.format(
+                  totalBaseUnits: totalPills,
+                  unitType: 'pill',
+                  pillsPerLeaflet: pillsPerLeaflet,
+                  leafletsPerBox: leafletsPerBox,
+                );
                 final profile = ref.read(userProfileProvider).value;
                 final lowStockThreshold = profile?.lowStockThreshold ?? 10;
-                final isLowStock = stockQty <= lowStockThreshold;
+                final isLowStock = totalPills <= lowStockThreshold;
                 
                 return ListTile(
                   title: Text(med['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${med['form'] ?? 'Tablet'} • Stock: ${item['stock_qty']} • Price: \$${item['price']}'),
+                  subtitle: Text('${med['form'] ?? 'Tablet'} • $stockDisplay • \$${item['price']}'),
                   leading: isLowStock
                       ? const Icon(Icons.warning, color: Colors.orange)
                       : const Icon(Icons.check_circle, color: Colors.green),
@@ -338,9 +349,29 @@ class MedicineSearchDelegate extends SearchDelegate<Medicine?> {
           itemBuilder: (context, index) {
             final med = results[index];
             return ListTile(
-              title: Text(med.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('${med.form ?? "N/A"} • ${med.strength ?? "N/A"}'),
-              trailing: Text(med.manufacturer ?? ''),
+              leading: const Icon(Icons.medication),
+              title: Text(
+                med.name,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                '${med.form ?? "N/A"} • ${med.strength ?? "N/A"}',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              trailing: med.manufacturer != null && med.manufacturer!.isNotEmpty
+                  ? SizedBox(
+                      width: 80,
+                      child: Text(
+                        med.manufacturer!,
+                        style: TextStyle(color: Colors.blue[700], fontSize: 11),
+                        textAlign: TextAlign.right,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )
+                  : null,
               onTap: () => close(context, med),
             );
           },

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prescription_scanner/presentation/providers/auth_provider.dart';
-import 'package:prescription_scanner/presentation/providers/owner_provider.dart';
 import 'package:prescription_scanner/data/providers.dart';
 import 'package:prescription_scanner/core/helpers/permission_helper.dart';
 import 'package:geolocator/geolocator.dart';
@@ -66,11 +65,33 @@ class _PharmacySetupPageState extends ConsumerState<PharmacySetupPage> {
       final user = ref.read(userProvider);
       final supabase = ref.read(supabaseProvider);
 
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Debug: Check user's profile role
+      final profile = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+      
+      debugPrint('DEBUG: User ID = ${user.id}');
+      debugPrint('DEBUG: Profile = $profile');
+      
+      if (profile == null) {
+        throw Exception('Profile not found. Please log out and sign up again.');
+      }
+      
+      if (profile['role'] != 'pharmacy_owner') {
+        throw Exception('Your account role is "${profile['role']}". Only pharmacy_owner accounts can create pharmacies. Please sign up with the Pharmacy Owner role.');
+      }
+
       await supabase.from('pharmacies').insert({
-        'owner_id': user!.id,
-        'name': _nameCtrl.text,
-        'address': _addressCtrl.text,
-        'contact_number': _contactCtrl.text,
+        'owner_id': user.id,
+        'name': _nameCtrl.text.trim(),
+        'address': _addressCtrl.text.trim(),
+        'contact_number': _contactCtrl.text.trim(),
         'latitude': _latitude,
         'longitude': _longitude,
       });
@@ -78,10 +99,25 @@ class _PharmacySetupPageState extends ConsumerState<PharmacySetupPage> {
       // Refresh provider
       ref.invalidate(myPharmacyProvider);
       
-      if (mounted) Navigator.of(context).pop();
-    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Pharmacy created successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      debugPrint('ERROR creating pharmacy: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

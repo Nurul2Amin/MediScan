@@ -1,11 +1,11 @@
 {
-    "name": "prescription_scanner",
-    "short_name": "prescription_scanner",
+    "name": "MediScan",
+    "short_name": "MediScan",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Scan prescriptions and find nearby pharmacies with stock.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

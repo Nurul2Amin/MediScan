@@ -1,19 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:prescription_scanner/data/models/parsed_medicine.dart';
 import 'package:prescription_scanner/data/models/medicine.dart';
-import 'package:prescription_scanner/data/sources/remote/gemini_service.dart';
+import 'package:prescription_scanner/data/sources/remote/edge_function_gemini_service.dart';
 import 'package:prescription_scanner/data/sources/supabase/supabase_client.dart';
 
 class MedicineRepository {
-  final GeminiService _geminiService;
+  final EdgeFunctionGeminiService _geminiService;
   final AppSupabaseClient _supabaseClient;
 
   MedicineRepository({
-    required GeminiService geminiService,
+    required EdgeFunctionGeminiService geminiService,
     required AppSupabaseClient supabaseClient,
   })  : _geminiService = geminiService,
         _supabaseClient = supabaseClient;
 
-  // Extract medicines from image
+  
   Future<List<ParsedMedicine>> extractMedicines(String imagePath) async {
     final result = await _geminiService.extractMedicines(imagePath);
     final List<dynamic> list = result['medicines'] ?? [];
@@ -107,48 +108,66 @@ class MedicineRepository {
   }
 
   // Search Global Medicines (for Homepage & Inventory)
+  // Uses PostgreSQL trigram fuzzy search for typo tolerance
   Future<List<Medicine>> searchMedicines(String query) async {
     if (query.isEmpty) return [];
+    if (query.length < 2) return []; // Require at least 2 characters
+    
     try {
+      // Use the trigram fuzzy search RPC function
       final response = await _supabaseClient.supabase
-          .from('medicines')
-          .select()
-          .ilike('name', '%$query%')
-          .limit(50); // Increased limit to allow good sorting
+          .rpc('search_medicines_fuzzy', params: {
+            'search_query': query,
+            'result_limit': 50,
+          });
       
-      final List<Medicine> candidates = (response as List).map((e) => Medicine.fromJson(e)).toList();
-
-      // Client-side Sort: Exact Match > Starts With > Shorter Name > Alphabetical
-      candidates.sort((a, b) {
-        final nameA = a.name.toLowerCase();
-        final nameB = b.name.toLowerCase();
-        final q = query.toLowerCase();
-
-        // 1. Exact Match
-        final exactA = nameA == q;
-        final exactB = nameB == q;
-        if (exactA && !exactB) return -1;
-        if (!exactA && exactB) return 1;
-
-        // 2. Starts With
-        final startA = nameA.startsWith(q);
-        final startB = nameB.startsWith(q);
-        if (startA && !startB) return -1;
-        if (!startA && startB) return 1;
-
-        // 3. Length (Shorter is likely the main brand)
-        if (nameA.length != nameB.length) {
-          return nameA.length.compareTo(nameB.length);
-        }
-
-        // 4. Alphabetical
-        return nameA.compareTo(nameB);
-      });
-
-      return candidates;
+      // Results are already sorted by the database function
+      return (response as List).map((e) => Medicine.fromJson(e)).toList();
     } catch (e) {
-      return [];
+      // Fallback to simple search if RPC fails (e.g., function not deployed yet)
+      debugPrint('Fuzzy search failed, falling back to simple search: $e');
+      return _simpleSearch(query);
     }
+  }
+  
+  // Fallback simple search (if trigram not available)
+  Future<List<Medicine>> _simpleSearch(String query) async {
+    final response = await _supabaseClient.supabase
+        .from('medicines')
+        .select()
+        .ilike('name', '%$query%')
+        .limit(50);
+    
+    final List<Medicine> candidates = (response as List).map((e) => Medicine.fromJson(e)).toList();
+
+    // Client-side Sort: Exact Match > Starts With > Shorter Name > Alphabetical
+    candidates.sort((a, b) {
+      final nameA = a.name.toLowerCase();
+      final nameB = b.name.toLowerCase();
+      final q = query.toLowerCase();
+
+      // 1. Exact Match
+      final exactA = nameA == q;
+      final exactB = nameB == q;
+      if (exactA && !exactB) return -1;
+      if (!exactA && exactB) return 1;
+
+      // 2. Starts With
+      final startA = nameA.startsWith(q);
+      final startB = nameB.startsWith(q);
+      if (startA && !startB) return -1;
+      if (!startA && startB) return 1;
+
+      // 3. Length (Shorter is likely the main brand)
+      if (nameA.length != nameB.length) {
+        return nameA.length.compareTo(nameB.length);
+      }
+
+      // 4. Alphabetical
+      return nameA.compareTo(nameB);
+    });
+
+    return candidates;
   }
 
   // Get Popular Medicines (Mocked by fetching first 10 for now)
@@ -160,7 +179,7 @@ class MedicineRepository {
           .limit(10);
       return (response as List).map((e) => Medicine.fromJson(e)).toList();
     } catch (e) {
-      return [];
+      rethrow;
     }
   }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppSupabaseClient {
@@ -18,11 +19,11 @@ class AppSupabaseClient {
           .or('name.in.($namesList),generic_name.in.($namesList)');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      return [];
+      rethrow;
     }
   }
 
-  // Find best pharmacies using PostGIS RPC
+  // Find best pharmacies using PostGIS RPC (basic - just medicine IDs)
   Future<List<Map<String, dynamic>>> findBestPharmacies({
     required double userLat,
     required double userLng,
@@ -41,8 +42,64 @@ class AppSupabaseClient {
       );
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      // Return empty list on error
-      return [];
+      rethrow;
+    }
+  }
+
+  /// Find pharmacies with STOCK AVAILABILITY check
+  /// This converts customer's cart items (with quantity/unit) to base units
+  /// and only returns pharmacies that have sufficient stock
+  /// Now includes per-item pricing details from each pharmacy
+  Future<List<Map<String, dynamic>>> findPharmaciesWithStock({
+    required double userLat,
+    required double userLng,
+    required List<Map<String, dynamic>> cartItems, // [{medicine_id, quantity, unit_type}]
+    int radius = 5000,
+  }) async {
+    try {
+      final response = await supabase.rpc(
+        'find_pharmacies_with_stock_details',
+        params: {
+          'user_lat': userLat,
+          'user_lng': userLng,
+          'cart_items': cartItems,
+          'radius_m': radius,
+        },
+      );
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      // Fallback to old function if new one doesn't exist yet
+      try {
+        final response = await supabase.rpc(
+          'find_pharmacies_with_stock',
+          params: {
+            'user_lat': userLat,
+            'user_lng': userLng,
+            'cart_items': cartItems,
+            'radius_m': radius,
+          },
+        );
+        return List<Map<String, dynamic>>.from(response);
+      } catch (_) {
+        rethrow;
+      }
+    }
+  }
+
+  // Get pharmacy by owner_id (returns most recent if multiple exist)
+  Future<Map<String, dynamic>?> getPharmacyByOwnerId(String ownerId) async {
+    try {
+      final response = await supabase
+          .from('pharmacies')
+          .select()
+          .eq('owner_id', ownerId)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle(); // Get most recent pharmacy
+      return response;
+    } catch (e) {
+      debugPrint('Error fetching pharmacy: $e');
+      return null;
     }
   }
 }

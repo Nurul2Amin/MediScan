@@ -4,6 +4,7 @@ import 'package:prescription_scanner/presentation/providers/auth_provider.dart';
 import 'package:prescription_scanner/data/providers.dart';
 
 // Fetches the pharmacy owned by the logged-in user
+// If user has multiple pharmacies, returns the most recently created one
 final myPharmacyProvider = FutureProvider<Pharmacy?>((ref) async {
   final user = ref.watch(userProvider);
   final supabase = ref.watch(supabaseProvider);
@@ -15,6 +16,8 @@ final myPharmacyProvider = FutureProvider<Pharmacy?>((ref) async {
         .from('pharmacies')
         .select()
         .eq('owner_id', user.id)
+        .order('created_at', ascending: false)
+        .limit(1)
         .maybeSingle(); // Returns null if no pharmacy found
 
     if (response == null) return null;

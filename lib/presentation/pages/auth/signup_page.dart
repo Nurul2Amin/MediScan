@@ -40,8 +40,6 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     try {
       final supabase = ref.read(supabaseProvider);
       
-      // Sign up with metadata (role, full_name, phone)
-      // The trigger will read these from raw_user_meta_data
       final response = await supabase.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -54,16 +52,13 @@ class _SignupPageState extends ConsumerState<SignupPage> {
 
       if (mounted) {
         if (response.session != null) {
-          // User is automatically signed in (if email confirmation disabled)
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Account created successfully!'),
               backgroundColor: Colors.green,
             ),
           );
-          // Router will handle redirect based on role
         } else {
-          // Email confirmation required
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Please check your email to confirm your account.'),
@@ -71,7 +66,6 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               duration: Duration(seconds: 5),
             ),
           );
-          // Navigate back to login
           if (mounted) context.go('/login');
         }
       }
